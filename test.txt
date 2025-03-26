@@ -1,19 +1,6 @@
-lgit add .
+git add .
 git commit -m "Initial commit"
 git branch -M main
-git push -u origin maingit remote -vgit remote add origin https://github.com/StanLapsus/crypto.gitgit add .
-git commit -m "Initial commit"
-git branch -M main
-git push -u origin maingit add .
-git commit -m "Initial commit"
-git branch -M main
-git push -u origin maingit add .
-git commit -m "Initial commit"
-git branch -M main
-git push -u origin maingit add .
-git commit -m "Initial commit"
-git branch -M main
-git push -u origin maingit remote -vgit add .
-git commit -m "Initial commit"
-git branch -M main
+git remote add origin https://github.com/StanLapsus/crypto.git
+git remote -v
 git push -u origin main

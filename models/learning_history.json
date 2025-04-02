@@ -1,0 +1,9 @@
+{
+  "accuracy_over_time": [],
+  "feature_importance_over_time": [],
+  "predictions": [],
+  "retrain_events": [],
+  "learning_iterations": 0,
+  "human_feedback": [],
+  "anomalies_detected": []
+}

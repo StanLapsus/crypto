@@ -6,10 +6,14 @@ import asyncio
 import argparse
 from datetime import datetime, timedelta
 import pandas as pd
+import tracemalloc  # Add tracemalloc module
 from indicator_script import CryptoIndicators
 from ml_model import CryptoMLModel
 from news_sentiment import NewsSentimentAnalyzer
 from discord_bot import CryptoDiscordBot, DiscordLogger
+
+# Enable tracemalloc tracking
+tracemalloc.start(25)  # Number of frames to capture in tracebacks
 
 class CryptoPredictionSystem:
     def __init__(self, config=None):
@@ -19,10 +23,7 @@ class CryptoPredictionSystem:
         # API keys are now optional since we use free APIs
         self.news_api_key = None  # No longer required
         self.crypto_api_key = None  # No longer required
-        self.discord_token = 'MTI2MzA2MzIzMTkyMDg2OTM5OQ.GtJp5s.eEmAcvsd9XUQcfoVPlzl6JT9unkcvVr2KyicgU'  # Only Discord token might be needed
-        
-        # Create data directories
-        os.makedirs('data', exist_ok=True)
+        self.discord_token = ''
         os.makedirs('logs', exist_ok=True)
         os.makedirs('models', exist_ok=True)
         os.makedirs('data/feedback', exist_ok=True)
@@ -496,6 +497,17 @@ class CryptoPredictionSystem:
             if discord_thread and discord_thread.is_alive():
                 print("Waiting for Discord bot to shut down...")
                 time.sleep(5)
+    
+    def print_memory_stats(self):
+        """Print memory statistics and top allocations"""
+        current, peak = tracemalloc.get_traced_memory()
+        print(f"Current memory usage: {current / 10**6:.2f}MB; Peak: {peak / 10**6:.2f}MB")
+        
+        print("\nTop 10 memory allocations:")
+        snapshot = tracemalloc.take_snapshot()
+        top_stats = snapshot.statistics('lineno')
+        for i, stat in enumerate(top_stats[:10], 1):
+            print(f"#{i}: {stat}")
 
 
 # Temporary logger for startup before Discord bot is running
@@ -524,6 +536,7 @@ def parse_arguments():
     parser.add_argument('--evaluate', action='store_true', help='Evaluate past predictions')
     parser.add_argument('--days', type=int, default=7, help='Number of days to include in evaluation')
     parser.add_argument('--learn', action='store_true', help='Force learning evaluation and retraining')
+    parser.add_argument('--memory', action='store_true', help='Print memory statistics')
     
     return parser.parse_args()
 
@@ -538,9 +551,15 @@ if __name__ == "__main__":
         # Force a learning evaluation
         print("Forcing learning evaluation...")
         system.ml_model._evaluate_retraining_need()
+    elif args.memory:
+        # Print memory stats when requested
+        system.print_memory_stats()
     else:
         # Run a single prediction cycle or continuous mode
         if args.cycles == 1:
             system.run_prediction_cycle(symbol=args.symbol)
+            # Print memory stats after run for debugging
+            if tracemalloc.is_tracing():
+                system.print_memory_stats()
         else:
             system.run(interval_minutes=args.interval, cycles=args.cycles, discord=args.discord)

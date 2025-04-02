@@ -16,6 +16,7 @@ class DiscordLogger:
         self.log_channel_id = log_channel_id
         self.message_queue = []
         self.is_sending = False
+        self.tasks = []  # Track created tasks
         
     async def send_log(self, message, level="INFO", chart=None):
         """Send log message to Discord channel"""
@@ -65,7 +66,11 @@ class DiscordLogger:
         """Add message to queue for async sending"""
         self.message_queue.append((message, level, chart))
         if not self.is_sending:
-            asyncio.create_task(self._process_queue())
+            # Create and store the task reference to prevent warnings
+            task = asyncio.create_task(self._process_queue())
+            self.tasks.append(task)
+            # Add done callback to remove the task when completed
+            task.add_done_callback(lambda t: self.tasks.remove(t) if t in self.tasks else None)
             
     async def _process_queue(self):
         """Process queued messages"""

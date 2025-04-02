@@ -7,6 +7,7 @@ import time
 import os
 import traceback
 from api_utils import CryptoAPIUtils
+import pyarrow as pa  # Import pyarrow to fix the Parabolic SAR calculation error
 
 class CryptoIndicators:
     def __init__(self, api_key="your_default_api_key_here", discord_logger=None):
@@ -646,8 +647,8 @@ class CryptoIndicators:
             # Calculate true range components
             self.data = self.data.with_columns([
                 (pl.col('high') - pl.col('low')).alias('tr1'),
-                (pl.abs(pl.col('high') - pl.col('close').shift(1))).alias('tr2'),
-                (pl.abs(pl.col('low') - pl.col('close').shift(1))).alias('tr3')
+                (pl.col('high') - pl.col('close').shift(1)).abs().alias('tr2'),
+                (pl.col('low') - pl.col('close').shift(1)).abs().alias('tr3')
             ])
             
             # Calculate true range as max of components
@@ -854,7 +855,7 @@ class CryptoIndicators:
             
             signals = {
                 'timestamp': datetime.now().isoformat(),
-                'price': float(latest['close']),
+                'price': float(latest['close'].iloc[0]),
                 'indicators': {},
                 'signal': 'neutral',
                 'confidence': 0.5

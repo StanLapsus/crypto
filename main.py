@@ -78,6 +78,9 @@ class CryptoPredictionSystem:
                     self.indicators.discord_logger = self.discord_logger
                 if self.ml_model:
                     self.ml_model.discord_logger = self.discord_logger
+                
+                # Start the Discord bot asynchronously
+                self.discord_bot.start_async()  # Pe8a4
         except Exception as e:
             print(f"Error initializing Discord bot component: {e}")
             self.discord_bot = None

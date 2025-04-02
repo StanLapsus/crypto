@@ -103,9 +103,9 @@ class AutoEvaluator:
         next_24h = future_prices.iloc[min(24, len(future_prices)-1)]
         
         # Calculate price changes
-        price_change_1h = (next_1h['price'] - future_prices.iloc[0]['price']) / future_prices.iloc[0]['price']
-        price_change_4h = (next_4h['price'] - future_prices.iloc[0]['price']) / future_prices.iloc[0]['price']
-        price_change_24h = (next_24h['price'] - future_prices.iloc[0]['price']) / future_prices.iloc[0]['price']
+        price_change_1h = (next_1h['price'].iloc[0] - future_prices.iloc[0]['price'].iloc[0]) / future_prices.iloc[0]['price'].iloc[0]
+        price_change_4h = (next_4h['price'].iloc[0] - future_prices.iloc[0]['price'].iloc[0]) / future_prices.iloc[0]['price'].iloc[0]
+        price_change_24h = (next_24h['price'].iloc[0] - future_prices.iloc[0]['price'].iloc[0]) / future_prices.iloc[0]['price'].iloc[0]
         
         # Determine if prediction was correct
         actual_1h = 'buy' if price_change_1h > 0 else ('sell' if price_change_1h < 0 else 'neutral')

@@ -1,0 +1,7 @@
+{
+  "tasks": {
+    "launch": "pip install pyarrow",
+    "test": "python main.py",
+    "build": "python setup.py"
+  }
+}

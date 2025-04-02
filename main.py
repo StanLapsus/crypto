@@ -19,7 +19,7 @@ class CryptoPredictionSystem:
         # API keys are now optional since we use free APIs
         self.news_api_key = None  # No longer required
         self.crypto_api_key = None  # No longer required
-        self.discord_token = ''  # Only Discord token might be needed
+        self.discord_token = 'MTI2MzA2MzIzMTkyMDg2OTM5OQ.GtJp5s.eEmAcvsd9XUQcfoVPlzl6JT9unkcvVr2KyicgU'  # Only Discord token might be needed
         
         # Create data directories
         os.makedirs('data', exist_ok=True)

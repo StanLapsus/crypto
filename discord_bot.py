@@ -81,6 +81,10 @@ class DiscordLogger:
         finally:
             self.is_sending = False
 
+    def log(self, message, level="INFO", chart=None):
+        """Non-async version that queues the message"""
+        self.send_log_sync(message, level, chart)
+
 class CryptoDiscordBot:
     def __init__(self, prediction_system, token=None):
         self.token = token or os.environ.get('DISCORD_BOT_TOKEN')
@@ -95,9 +99,9 @@ class CryptoDiscordBot:
         self.bot = commands.Bot(command_prefix='!crypto ', intents=intents)
         
         # Logging channels (hardcoded IDs)
-        self.alert_channel_id = 9876543210987654321  # Replace with actual channel ID
-        self.log_channel_id = 9876543210987654321    # Replace with actual channel ID
-        self.learning_channel_id = 9876543210987654321  # Replace with actual channel ID
+        self.alert_channel_id = 1352649930501525587 # Replace with actual channel ID
+        self.log_channel_id = 1352649930501525587   # Replace with actual channel ID
+        self.learning_channel_id = 1352649930501525587  # Replace with actual channel ID
         
         # Create logger instance
         self.logger = DiscordLogger(self.bot, self.log_channel_id)
@@ -576,6 +580,146 @@ class CryptoDiscordBot:
                 
             except Exception as e:
                 await ctx.send(f"Error generating history: {str(e)}")
+        
+        @self.bot.command(name="chk", help="Show detailed system status and model information")
+        async def check_status(ctx):
+            """Show detailed system information and status"""
+            try:
+                # Create a rich embed for system status
+                embed = discord.Embed(
+                    title="Crypto System Detailed Status",
+                    color=discord.Color.gold(),
+                    timestamp=datetime.now()
+                )
+                
+                # Add basic system info
+                embed.add_field(
+                    name="System Components", 
+                    value=(
+                        f"Indicators: {'✅' if self.prediction_system.indicators else '❌'}\n"
+                        f"ML Model: {'✅' if self.prediction_system.ml_model else '❌'}\n"
+                        f"News Analyzer: {'✅' if self.prediction_system.news_analyzer else '❌'}"
+                    ),
+                    inline=False
+                )
+                
+                # Get logs directory info
+                log_files = os.listdir('logs')
+                prediction_files = [f for f in log_files if f.startswith('predictions_')]
+                most_recent = max(prediction_files, key=lambda x: os.path.getmtime(os.path.join('logs', x))) if prediction_files else "None"
+                
+                # Count total predictions
+                total_predictions = 0
+                for file in prediction_files:
+                    try:
+                        with open(os.path.join('logs', file), 'r') as f:
+                            predictions = json.load(f)
+                            total_predictions += len(predictions)
+                    except:
+                        pass
+                
+                embed.add_field(name="Total Predictions", value=str(total_predictions), inline=True)
+                embed.add_field(name="Most Recent Log", value=most_recent, inline=True)
+                
+                # ML Model details
+                if self.prediction_system.ml_model:
+                    ml = self.prediction_system.ml_model
+                    
+                    # Get model info
+                    model_info = f"Iterations: {ml.learning_history.get('learning_iterations', 0)}"
+                    
+                    if hasattr(ml, 'last_retrain_time'):
+                        days_since = (datetime.now() - ml.last_retrain_time).days
+                        model_info += f"\nLast retrain: {days_since} days ago"
+                    
+                    if ml.learning_history.get('accuracy_over_time'):
+                        latest_acc = ml.learning_history['accuracy_over_time'][-1]['accuracy']
+                        model_info += f"\nAccuracy: {latest_acc*100:.1f}%"
+                    
+                    embed.add_field(name="ML Model", value=model_info, inline=False)
+                    
+                    # If there are top features, add them
+                    if ml.learning_history.get('feature_importance_over_time'):
+                        latest = ml.learning_history['feature_importance_over_time'][-1]
+                        top_features = "\n".join([
+                            f"{i+1}. {item['feature']} ({item['importance']:.4f})"
+                            for i, item in enumerate(latest['importance'][:3])
+                        ])
+                        
+                        if top_features:
+                            embed.add_field(name="Top Features", value=top_features, inline=True)
+                
+                # Indicators details
+                if self.prediction_system.indicators:
+                    indicators = self.prediction_system.indicators
+                    
+                    # Get indicators performance
+                    perf = {}
+                    for k, v in indicators.indicator_performance.items():
+                        correct = v.get('correct', 0)
+                        incorrect = v.get('incorrect', 0)
+                        total = correct + incorrect
+                        accuracy = correct / total if total > 0 else 0.5
+                        perf[k] = {
+                            'acc': accuracy,
+                            'weight': v.get('weight', 1.0),
+                            'total': total
+                        }
+                    
+                    # Format top 3 indicators by accuracy
+                    top_indicators = sorted(perf.items(), key=lambda x: x[1]['acc'], reverse=True)[:3]
+                    indicator_info = "\n".join([
+                        f"{name}: {data['acc']*100:.1f}% acc, weight: {data['weight']:.1f}"
+                        for name, data in top_indicators if data['total'] > 0
+                    ])
+                    
+                    embed.add_field(name="Top Indicators", value=indicator_info or "No indicator data", inline=True)
+                    
+                    # Current weights
+                    weights_info = "\n".join([
+                        f"{k}: {v:.2f}" for k, v in indicators.indicator_weights.items()
+                    ][:5])  # Show top 5 weights
+                    
+                    embed.add_field(name="Indicator Weights", value=weights_info, inline=True)
+                
+                # Memory usage
+                try:
+                    import psutil
+                    process = psutil.Process()
+                    memory_usage = process.memory_info().rss / 1024**2  # MB
+                    embed.add_field(name="Memory Usage", value=f"{memory_usage:.1f} MB", inline=True)
+                except:
+                    pass
+                
+                # Add latest prediction if available
+                today = datetime.now().strftime('%Y%m%d')
+                log_file = f"logs/predictions_{today}.json"
+                if os.path.exists(log_file):
+                    try:
+                        with open(log_file, 'r') as f:
+                            predictions = json.load(f)
+                            if predictions:
+                                latest = predictions[-1]
+                                
+                                latest_info = (
+                                    f"Signal: {latest.get('signal', 'neutral').upper()}\n"
+                                    f"Confidence: {latest.get('confidence', 0)*100:.1f}%\n"
+                                    f"Time: {datetime.fromisoformat(latest.get('timestamp', '')).strftime('%H:%M:%S')}"
+                                )
+                                
+                                embed.add_field(name="Latest Prediction", value=latest_info, inline=False)
+                    except:
+                        pass
+                
+                await ctx.send(embed=embed)
+                
+                # Generate and send a detailed status image
+                status_img = await self._generate_system_status_chart()
+                if status_img:
+                    await ctx.send(file=discord.File(status_img, 'system_status.png'))
+                
+            except Exception as e:
+                await ctx.send(f"Error generating system status: {str(e)}")
     
     async def generate_forecast_chart(self, forecast_data):
         """Generate a chart visualizing the forecast"""
@@ -647,6 +791,131 @@ class CryptoDiscordBot:
             
         except Exception as e:
             print(f"Error generating learning chart: {e}")
+            return None
+    
+    async def _generate_system_status_chart(self):
+        """Generate a chart showing system status and statistics"""
+        try:
+            # Create a figure with subplots
+            fig, axs = plt.subplots(2, 1, figsize=(10, 8))
+            
+            # Get prediction history data
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=7)
+            
+            all_predictions = []
+            
+            # Load prediction logs
+            for i in range(7):
+                date = end_date - timedelta(days=i)
+                log_file = f"logs/predictions_{date.strftime('%Y%m%d')}.json"
+                
+                if os.path.exists(log_file):
+                    with open(log_file, 'r') as f:
+                        try:
+                            predictions = json.load(f)
+                            all_predictions.extend(predictions)
+                        except:
+                            continue
+            
+            if all_predictions:
+                # Convert to DataFrame for analysis
+                import pandas as pd
+                df = pd.DataFrame(all_predictions)
+                
+                # Parse timestamps
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                
+                # Sort by timestamp
+                df = df.sort_values('timestamp')
+                
+                # Create a numerical signal column for plotting
+                df['signal_num'] = df['signal'].map({'buy': 1, 'neutral': 0, 'sell': -1})
+                
+                # Plot signal and confidence
+                axs[0].plot(df['timestamp'], df['signal_num'], 'o-', label='Signal')
+                
+                # Color-code points by signal
+                colors = df['signal'].map({'buy': 'green', 'neutral': 'blue', 'sell': 'red'})
+                axs[0].scatter(df['timestamp'], df['signal_num'], c=colors, s=df['confidence']*100, alpha=0.7)
+                
+                # Add lines at buy, neutral, and sell levels
+                axs[0].axhline(y=1, color='green', linestyle='--', alpha=0.3)
+                axs[0].axhline(y=0, color='blue', linestyle='--', alpha=0.3)
+                axs[0].axhline(y=-1, color='red', linestyle='--', alpha=0.3)
+                
+                axs[0].set_ylabel('Signal')
+                axs[0].set_yticks([-1, 0, 1])
+                axs[0].set_yticklabels(['Sell', 'Neutral', 'Buy'])
+                axs[0].set_title('Recent Prediction Signals')
+                axs[0].grid(True, alpha=0.3)
+            
+            # Plot ML model accuracy if available
+            if self.prediction_system.ml_model and self.prediction_system.ml_model.learning_history.get('accuracy_over_time'):
+                accuracy_data = self.prediction_system.ml_model.learning_history['accuracy_over_time']
+                
+                if accuracy_data:
+                    timestamps = [datetime.fromisoformat(entry['timestamp']) for entry in accuracy_data]
+                    accuracies = [entry['accuracy'] for entry in accuracy_data]
+                    
+                    # Plot accuracy trend
+                    axs[1].plot(timestamps, accuracies, 'o-', color='purple')
+                    axs[1].set_title('ML Model Accuracy Over Time')
+                    axs[1].set_ylabel('Accuracy')
+                    axs[1].set_ylim([0, 1])
+                    axs[1].grid(True, alpha=0.3)
+                    
+                    # Highlight retraining events
+                    if self.prediction_system.ml_model.learning_history.get('retrain_events'):
+                        retrain_times = [datetime.fromisoformat(entry['timestamp']) 
+                                         for entry in self.prediction_system.ml_model.learning_history['retrain_events']]
+                        
+                        for rt in retrain_times:
+                            axs[1].axvline(x=rt, color='red', linestyle='--', alpha=0.3)
+            else:
+                # If no ML data, show indicator performance
+                if self.prediction_system.indicators and hasattr(self.prediction_system.indicators, 'indicator_performance'):
+                    perf = self.prediction_system.indicators.indicator_performance
+                    indicators = []
+                    accuracies = []
+                    
+                    for k, v in perf.items():
+                        correct = v.get('correct', 0)
+                        incorrect = v.get('incorrect', 0)
+                        total = correct + incorrect
+                        if total > 0:
+                            indicators.append(k)
+                            accuracies.append(correct / total)
+                    
+                    if indicators:
+                        # Only show top indicators if there are many
+                        if len(indicators) > 8:
+                            # Sort by accuracy and take top 8
+                            sorted_data = sorted(zip(indicators, accuracies), key=lambda x: x[1], reverse=True)
+                            indicators = [x[0] for x in sorted_data[:8]]
+                            accuracies = [x[1] for x in sorted_data[:8]]
+                        
+                        axs[1].bar(indicators, accuracies, color='skyblue')
+                        axs[1].set_title('Indicator Performance')
+                        axs[1].set_ylabel('Accuracy')
+                        axs[1].set_ylim([0, 1])
+                        axs[1].grid(True, alpha=0.3)
+                        plt.setp(axs[1].xaxis.get_majorticklabels(), rotation=45, ha='right')
+            
+            plt.tight_layout()
+            
+            # Save figure to buffer
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            plt.close(fig)
+            
+            return buf
+            
+        except Exception as e:
+            print(f"Error generating system status chart: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def get_color_for_signal(self, signal):

@@ -16,14 +16,15 @@ from learning_tracker import LearningTracker
 
 class CryptoMLModel:
     def __init__(self, discord_logger=None):
+        self.discord_logger = discord_logger
+        self.model_dir = 'models'  # Initialize model directory
         self.model = None
         self.scaler = StandardScaler()
         self.imputer = SimpleImputer(strategy='mean')
-        self.discord_logger = discord_logger
-        
-        # Replace the learning history tracking with LearningTracker
         self.learning_tracker = LearningTracker(self.model_dir, discord_logger)
         self.learning_history = self.learning_tracker.history
+        self.feedback_samples = []
+        self.min_feedback_samples = 10
         
         # All possible features - the model will adapt based on what's available
         self.all_feature_columns = [
@@ -65,12 +66,10 @@ class CryptoMLModel:
         # Self-learning parameters
         self.learning_rate = 0.1
         self.min_feedback_samples = 5  # Minimum number of samples before retraining
-        self.feedback_samples = []
         self.anomaly_cases = []
         self.last_retrain_time = datetime.now()
         self.auto_retrain_days = 7  # Automatically retrain every 7 days
         
-        self.model_dir = 'models'
         os.makedirs(self.model_dir, exist_ok=True)
         os.makedirs('data/feedback', exist_ok=True)
         

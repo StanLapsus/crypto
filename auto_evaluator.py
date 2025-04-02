@@ -151,6 +151,13 @@ class AutoEvaluator:
             print("No price data available for evaluation.")
             return None
         
+        # Ensure we're using the correct method name when evaluating indicators
+        if hasattr(self.system, 'indicators') and self.system.indicators:
+            # Fix any potential typo from run_analyeis to run_analysis
+            if hasattr(self.system.indicators, 'run_analysis'):
+                # Use the correct method name
+                indicator_data = self.system.indicators.run_analysis(symbol, '1h')
+        
         # Evaluate each prediction
         evaluations = []
         for _, prediction in prediction_df.iterrows():
